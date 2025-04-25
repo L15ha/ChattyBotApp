@@ -1,7 +1,7 @@
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-app.UseStaticFiles();  // Serves wwwroot by default
+app.UseStaticFiles();
 
 // Serve index.html
 app.MapGet("/", () => Results.Redirect("/index.html"));
@@ -12,13 +12,25 @@ app.MapPost("/chat", async (HttpRequest request) =>
     var data = await request.ReadFromJsonAsync<ChatRequest>();
     var userMessage = data.Messages.Last().Content;
 
+    // Exact match first
     foreach (var item in ChattyFAQ.Data)
     {
         if (userMessage.Contains(item.Key))
             return Results.Json(new { reply = item.Value });
     }
 
-    return Results.Json(new { reply = "This is a mock GPT reply." });
+    // If no exact match, try partial suggestions
+    var suggestions = ChattyFAQ.Data.Keys
+        .Where(key => userMessage.Any(c => key.Contains(c)))
+        .ToList();
+
+    if (suggestions.Any())
+    {
+        string suggested = suggestions.First();
+        return Results.Json(new { reply = $"คุณหมายถึง \"{suggested}\" หรือไม่?\nคำตอบ: {ChattyFAQ.Data[suggested]}" });
+    }
+
+    return Results.Json(new { reply = "ขออภัย ไม่พบข้อมูลที่เกี่ยวข้องครับ" });
 });
 
 // POST /upload
